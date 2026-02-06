@@ -42,6 +42,12 @@ def main():
     rag = init_rag()
     loader = init_loader(rag)
 
+    # 벡터DB가 비어있으면 자동으로 문서 로드
+    if rag.store.get_collection_count() == 0:
+        with st.spinner("기본 문서를 로드하고 있습니다..."):
+            loader.ingest_all()
+        st.rerun()
+
     # --- 사이드바 ---
     with st.sidebar:
         st.header("설정")
