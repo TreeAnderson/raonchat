@@ -59,8 +59,13 @@ create table chat_logs (
     response text not null,
     source_documents jsonb default '[]'::jsonb,
     metadata jsonb default '{}'::jsonb,
+    thinking_mode int default 0,
+    user_id text,
     created_at timestamptz default now()
 );
+
+-- user_id 인덱스
+create index if not exists idx_chat_logs_user_id on chat_logs(user_id);
 
 -- 6. RLS 비활성화 & anon 권한 부여
 alter table documents disable row level security;

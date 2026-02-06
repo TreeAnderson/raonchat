@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from config import settings
-from embeddings import get_embeddings
-from vectorstore import SupabaseStore
-from data_loader import DataLoader
-from rag import RAGChain
-from utils import ChatLogger
+from src.ai_backend.config import settings
+from src.ai_backend.services.embeddings import get_embeddings
+from src.ai_backend.services.vectorstore import SupabaseStore
+from src.ai_backend.services.data_loader import DataLoader
+from src.ai_backend.services.rag_chain import RAGChain
+from src.ai_backend.services.chat_logger import ChatLogger
 
 
 def print_help():

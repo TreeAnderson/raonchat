@@ -1,9 +1,4 @@
 import os
-import sys
-from pathlib import Path
-
-# 프로젝트 루트를 sys.path 최상위에 추가 (패키지명 충돌 방지)
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import streamlit as st
 
@@ -25,9 +20,9 @@ for key in _SECRET_KEYS:
         except (KeyError, FileNotFoundError):
             pass
 
-from config import settings
-from data_loader import DataLoader
-from rag import RAGChain
+from src.ai_backend.config import settings
+from src.ai_backend.services.data_loader import DataLoader
+from src.ai_backend.services.rag_chain import RAGChain
 
 
 @st.cache_resource

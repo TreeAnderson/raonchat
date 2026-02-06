@@ -1,52 +1,11 @@
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from config import settings
-from embeddings import get_embeddings
-from vectorstore import SupabaseStore
-from utils import ChatLogger
-
-CODE_KEYWORDS = (
-    "코드", "구현", "인터페이스", "타입", "함수", "컴포넌트",
-    "typescript", "mermaid", "소스", "다이어그램", "흐름도",
-)
-
-PROMPT_TEMPLATE = """\
-너는 제공된 문서의 정보만을 사용하여 질문에 답변하는 전문가야.
-- 문서에 없는 내용은 "제공된 문서에서 해당 정보를 찾을 수 없습니다"라고 답해.
-- 가능하면 문서의 구체적인 내용을 인용해.
-- 가능하면 전체적인 관점에서 내용을 조합해.
-- 답변은 간결하게 해.
-- 옆의 설명은 간결하게 해.
-
-<context>
-{context}
-</context>
-
-질문: {question}
-
-답변:"""
-
-THINKING_PROMPT_TEMPLATE = """\
-너는 제공된 문서의 정보만을 사용하여 질문에 심도 있게 답변하는 전문가야.
-
-## 기본 원칙
-- 반드시 문서에 있는 내용만 사용해. 문서에 없는 내용은 "제공된 문서에서 해당 정보를 찾을 수 없습니다"라고 답해.
-- 가능하면 문서의 구체적인 내용을 인용해.
-
-## 심층 분석 지침
-- 관련 용어나 개념이 있으면 먼저 간략히 설명해.
-- 답변을 단계별로 구조화해서 작성해.
-- 문서의 여러 섹션에 걸친 내용이면 관련 섹션들을 연결해서 종합적으로 분석해.
-- 핵심 포인트를 정리해서 제공해.
-
-<context>
-{context}
-</context>
-
-질문: {question}
-
-답변:"""
+from ..config import settings
+from ..prompts.chat import CODE_KEYWORDS, PROMPT_TEMPLATE, THINKING_PROMPT_TEMPLATE
+from .embeddings import get_embeddings
+from .vectorstore import SupabaseStore
+from .chat_logger import ChatLogger
 
 
 class RAGChain:
@@ -81,9 +40,14 @@ class RAGChain:
         q = question.lower()
         return any(kw in q for kw in CODE_KEYWORDS)
 
-    def query(self, question: str, thinking: bool = False) -> dict:
+    def query(
+        self,
+        question: str,
+        thinking: bool = False,
+        user_id: str | None = None,
+    ) -> dict:
         try:
-            return self._query(question, thinking=thinking)
+            return self._query(question, thinking=thinking, user_id=user_id)
         except Exception as e:
             if "RESOURCE_EXHAUSTED" in str(e) or "429" in str(e):
                 return {
@@ -97,7 +61,12 @@ class RAGChain:
                 }
             raise
 
-    def _query(self, question: str, thinking: bool = False) -> dict:
+    def _query(
+        self,
+        question: str,
+        thinking: bool = False,
+        user_id: str | None = None,
+    ) -> dict:
         search_filter = None if self._is_code_query(question) else {"content_type": "prose"}
         docs_with_scores = self._store.similarity_search_with_score(
             question, k=settings.retriever_k, filter=search_filter
@@ -111,7 +80,6 @@ class RAGChain:
                 "retrieved_documents": [],
             }
 
-        # Extract unique (section_number, source) pairs from top-k results
         seen = set()
         section_keys = []
         for doc, score in docs_with_scores:
@@ -121,7 +89,6 @@ class RAGChain:
                 seen.add((sn, src))
                 section_keys.append((sn, src))
 
-        # Fetch full sections and assemble context
         if section_keys:
             context_parts = []
             for sn, src in section_keys:
@@ -131,7 +98,6 @@ class RAGChain:
                     context_parts.append(section_content)
             context = "\n\n---\n\n".join(context_parts)
         else:
-            # Fallback: no section_number available, use top-k as-is
             context = "\n\n".join(doc.page_content for doc, _ in docs_with_scores)
 
         llm = self._thinking_llm if thinking else self._llm
@@ -158,7 +124,10 @@ class RAGChain:
         }
 
         try:
-            self._logger.log(question, answer, retrieved, thinking_mode=thinking)
+            self._logger.log(
+                question, answer, retrieved,
+                thinking_mode=thinking, user_id=user_id,
+            )
         except Exception as e:
             result["log_error"] = str(e)
 

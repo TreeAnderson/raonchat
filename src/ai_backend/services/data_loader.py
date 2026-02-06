@@ -5,8 +5,8 @@ from pathlib import Path
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from config import settings
-from vectorstore import SupabaseStore
+from ..config import settings
+from .vectorstore import SupabaseStore
 
 _HEADING_RE = re.compile(r'^(#{2,4})\s+(\d[\d.]*)\s+(.*)')
 _HEADING_NO_NUM_RE = re.compile(r'^(#{2,4})\s+(.*)')
@@ -26,13 +26,6 @@ class DataLoader:
 
     @staticmethod
     def _parse_heading(line: str) -> dict | None:
-        """Parse a heading line into level, number, and title.
-
-        Examples:
-            "## 2. 동기본정보입력"   → level=2, number="2", title="동기본정보입력"
-            "#### 2.2.1 동 생성"     → level=4, number="2.2.1", title="동 생성"
-            "## 목차"                → level=2, number="", title="목차"
-        """
         m = _HEADING_RE.match(line.strip())
         if m:
             level = len(m.group(1))
@@ -47,17 +40,10 @@ class DataLoader:
         return None
 
     def _separate_code_blocks(self, sections: list[dict]) -> list[dict]:
-        """각 섹션에서 코드블록(```)을 분리하여 prose/code 청크로 나눈다.
-
-        Returns:
-            list of dicts with all metadata keys from the section preserved,
-            plus "content_type" and optionally "code_language".
-        """
         result: list[dict] = []
         code_pattern = re.compile(r"(```(\w*)\n.*?```)", re.DOTALL)
 
         for sec in sections:
-            # Build base metadata (everything except "content")
             base_meta = {k: v for k, v in sec.items() if k != "content"}
 
             parts = code_pattern.split(sec["content"])
@@ -94,17 +80,9 @@ class DataLoader:
         return result
 
     def _split_markdown_sections(self, text: str) -> list[dict]:
-        """마크다운을 ##/###/#### 헤딩 기준으로 분할하고, 코드블록을 분리한다.
-
-        Returns:
-            list of {"content": str, "section": str, "section_number": str,
-                      "h2": str, "h2_number": str, "h2_title": str,
-                      "h3": ..., "h4": ..., "content_type": str, ...}
-        """
         lines = text.split("\n")
         sections: list[dict] = []
 
-        # Current heading state
         current_h2 = ""
         current_h2_number = ""
         current_h2_title = ""
@@ -127,7 +105,6 @@ class DataLoader:
             return " > ".join(parts)
 
         def _section_number() -> str:
-            """Return the most specific section number (H4 > H3 > H2)."""
             if current_h4_number:
                 return current_h4_number
             if current_h3_number:
@@ -190,16 +167,13 @@ class DataLoader:
 
         _flush()
 
-        # 코드블록 분리
         separated = self._separate_code_blocks(sections)
 
-        # 2차 분할: prose만 대상, 코드 청크는 그대로 유지
         result: list[dict] = []
         for sec in separated:
             if sec["content_type"] == "code" or len(sec["content"]) <= settings.chunk_size:
                 result.append(sec)
             else:
-                # Preserve all metadata except content
                 base_meta = {k: v for k, v in sec.items() if k != "content"}
                 sub_chunks = self._splitter.split_text(sec["content"])
                 for chunk in sub_chunks:

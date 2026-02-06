@@ -5,7 +5,7 @@ from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from supabase import create_client, Client
 
-from config import settings
+from ..config import settings
 
 EMBED_BATCH_SIZE = 20
 EMBED_BATCH_DELAY = 15.0
