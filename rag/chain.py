@@ -6,6 +6,11 @@ from embeddings import get_embeddings
 from vectorstore import SupabaseStore
 from utils import ChatLogger
 
+CODE_KEYWORDS = (
+    "코드", "구현", "인터페이스", "타입", "함수", "컴포넌트",
+    "typescript", "mermaid", "소스", "다이어그램", "흐름도",
+)
+
 PROMPT_TEMPLATE = """\
 너는 제공된 문서의 정보만을 사용하여 질문에 답변하는 전문가야.
 - 문서에 없는 내용은 "제공된 문서에서 해당 정보를 찾을 수 없습니다"라고 답해.
@@ -38,9 +43,31 @@ class RAGChain:
     def store(self) -> SupabaseStore:
         return self._store
 
+    @staticmethod
+    def _is_code_query(question: str) -> bool:
+        q = question.lower()
+        return any(kw in q for kw in CODE_KEYWORDS)
+
     def query(self, question: str) -> dict:
+        try:
+            return self._query(question)
+        except Exception as e:
+            if "RESOURCE_EXHAUSTED" in str(e) or "429" in str(e):
+                return {
+                    "question": question,
+                    "answer": (
+                        "현재 API 호출 한도에 도달했습니다. "
+                        "약 1분 후에 다시 질문해 주세요.\n\n"
+                        "> Gemini 무료 플랜은 분당 요청 수가 제한되어 있습니다."
+                    ),
+                    "retrieved_documents": [],
+                }
+            raise
+
+    def _query(self, question: str) -> dict:
+        search_filter = None if self._is_code_query(question) else {"content_type": "prose"}
         docs_with_scores = self._store.similarity_search_with_score(
-            question, k=settings.retriever_k
+            question, k=settings.retriever_k, filter=search_filter
         )
 
         if not docs_with_scores:

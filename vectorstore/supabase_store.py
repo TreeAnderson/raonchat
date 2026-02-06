@@ -7,8 +7,8 @@ from supabase import create_client, Client
 
 from config import settings
 
-EMBED_BATCH_SIZE = 50
-EMBED_BATCH_DELAY = 1.0
+EMBED_BATCH_SIZE = 20
+EMBED_BATCH_DELAY = 15.0
 
 
 class SupabaseStore:
@@ -22,17 +22,22 @@ class SupabaseStore:
             self._client = create_client(settings.supabase_url, settings.supabase_key)
         return self._client
 
-    def similarity_search(self, query: str, k: int = 3) -> list[Document]:
-        results = self.similarity_search_with_score(query, k=k)
+    def similarity_search(
+        self, query: str, k: int = 3, filter: dict | None = None
+    ) -> list[Document]:
+        results = self.similarity_search_with_score(query, k=k, filter=filter)
         return [doc for doc, _ in results]
 
     def similarity_search_with_score(
-        self, query: str, k: int = 3
+        self, query: str, k: int = 3, filter: dict | None = None
     ) -> list[tuple[Document, float]]:
         query_embedding = self._embeddings.embed_query(query)
+        rpc_params = {"query_embedding": query_embedding, "match_count": k}
+        if filter:
+            rpc_params["filter"] = filter
         response = self.client.rpc(
             "match_documents",
-            {"query_embedding": query_embedding, "match_count": k},
+            rpc_params,
         ).execute()
 
         results = []

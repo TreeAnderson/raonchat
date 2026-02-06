@@ -21,11 +21,59 @@ class DataLoader:
             separators=self.SEPARATORS,
         )
 
-    def _split_markdown_sections(self, text: str) -> list[dict]:
-        """마크다운을 ### 헤딩 기준으로 분할하고, 부모 ## 경로를 프리픽스로 추가한다.
+    def _separate_code_blocks(self, sections: list[dict]) -> list[dict]:
+        """각 섹션에서 코드블록(```)을 분리하여 prose/code 청크로 나눈다.
 
         Returns:
-            list of {"content": str, "section": str}
+            list of {"content": str, "section": str, "content_type": "prose"|"code",
+                      "code_language": str (code only)}
+        """
+        result: list[dict] = []
+        code_pattern = re.compile(r"(```(\w*)\n.*?```)", re.DOTALL)
+
+        for sec in sections:
+            parts = code_pattern.split(sec["content"])
+            # re.split with groups returns: [before, full_match, lang, between, full_match, lang, ...]
+            i = 0
+            while i < len(parts):
+                if i + 2 < len(parts) and parts[i + 1] is not None and parts[i + 1].startswith("```"):
+                    # prose before the code block
+                    prose_text = parts[i].strip()
+                    if prose_text:
+                        result.append({
+                            "content": prose_text,
+                            "section": sec["section"],
+                            "content_type": "prose",
+                        })
+                    # code block
+                    code_text = parts[i + 1].strip()
+                    code_lang = parts[i + 2] or ""
+                    if code_text:
+                        result.append({
+                            "content": code_text,
+                            "section": sec["section"],
+                            "content_type": "code",
+                            "code_language": code_lang,
+                        })
+                    i += 3
+                else:
+                    # trailing prose (no more code blocks)
+                    prose_text = parts[i].strip()
+                    if prose_text:
+                        result.append({
+                            "content": prose_text,
+                            "section": sec["section"],
+                            "content_type": "prose",
+                        })
+                    i += 1
+
+        return result
+
+    def _split_markdown_sections(self, text: str) -> list[dict]:
+        """마크다운을 ### 헤딩 기준으로 분할하고, 코드블록을 분리한다.
+
+        Returns:
+            list of {"content": str, "section": str, "content_type": str, ...}
         """
         lines = text.split("\n")
         sections: list[dict] = []
@@ -57,15 +105,22 @@ class DataLoader:
 
         _flush()
 
-        # 2차 분할: max_chunk_size 초과 시 RecursiveCharacterTextSplitter 적용
+        # 코드블록 분리
+        separated = self._separate_code_blocks(sections)
+
+        # 2차 분할: prose만 대상, 코드 청크는 그대로 유지
         result: list[dict] = []
-        for sec in sections:
-            if len(sec["content"]) <= settings.chunk_size:
+        for sec in separated:
+            if sec["content_type"] == "code" or len(sec["content"]) <= settings.chunk_size:
                 result.append(sec)
             else:
                 sub_chunks = self._splitter.split_text(sec["content"])
                 for chunk in sub_chunks:
-                    result.append({"content": chunk, "section": sec["section"]})
+                    result.append({
+                        "content": chunk,
+                        "section": sec["section"],
+                        "content_type": "prose",
+                    })
 
         return result
 
@@ -112,18 +167,22 @@ class DataLoader:
             documents = []
             for i, sec in enumerate(section_chunks):
                 prefix = f"[{sec['section']}]\n\n" if sec["section"] else ""
+                meta = {
+                    "source": str(file_path),
+                    "filename": file_path.name,
+                    "title": title,
+                    "category": category,
+                    "section": sec["section"],
+                    "content_type": sec.get("content_type", "prose"),
+                    "chunk_index": i,
+                    "total_chunks": len(section_chunks),
+                    "ingested_at": datetime.now().isoformat(),
+                }
+                if sec.get("code_language"):
+                    meta["code_language"] = sec["code_language"]
                 doc = Document(
                     page_content=prefix + sec["content"],
-                    metadata={
-                        "source": str(file_path),
-                        "filename": file_path.name,
-                        "title": title,
-                        "category": category,
-                        "section": sec["section"],
-                        "chunk_index": i,
-                        "total_chunks": len(section_chunks),
-                        "ingested_at": datetime.now().isoformat(),
-                    },
+                    metadata=meta,
                 )
                 documents.append(doc)
         else:

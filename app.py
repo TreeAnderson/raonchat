@@ -41,9 +41,9 @@ def init_loader(_rag: RAGChain) -> DataLoader:
 
 
 def main():
-    st.set_page_config(page_title="raonChat", page_icon="🏗️", layout="wide")
-    st.title("raonChat")
-    st.caption("Gemini 전용 건설 프로젝트 관리 RAG 챗봇")
+    st.set_page_config(page_title="laonChat", page_icon="🏗️", layout="wide")
+    st.title("라온 챗봇 테스트")
+    st.caption("ConTech-DX 플랫폼 도우미 - 테스트 버전")
 
     rag = init_rag()
     loader = init_loader(rag)
@@ -111,7 +111,25 @@ def main():
                         st.text(doc["content"][:300])
                         st.divider()
 
-    if question := st.chat_input("질문을 입력하세요"):
+    # --- 빠른 질문 (입력창 바로 위 고정) ---
+    QUICK_QUESTIONS = [
+        ("🏢 플랫폼 소개", "ConTech-DX 플랫폼에 대해 소개해주세요"),
+        ("⚙️ 주요 기능", "이 플랫폼의 주요 기능은 무엇인가요?"),
+        ("🚀 시작 가이드", "플랫폼을 처음 사용하려면 어떻게 시작하면 되나요?"),
+        ("📋 공정계획 소개", "공정계획 기능에 대해 설명해주세요"),
+    ]
+
+    cols = st.columns(len(QUICK_QUESTIONS))
+    for i, (label, q) in enumerate(QUICK_QUESTIONS):
+        if cols[i].button(label, use_container_width=True, key=f"quick_{i}"):
+            st.session_state["pending_question"] = q
+            st.rerun()
+
+    question = st.chat_input("질문을 입력하세요")
+    if "pending_question" in st.session_state:
+        question = st.session_state.pop("pending_question")
+
+    if question:
         st.session_state.messages.append({"role": "user", "content": question})
         with st.chat_message("user"):
             st.markdown(question)
