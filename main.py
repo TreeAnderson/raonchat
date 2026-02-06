@@ -35,7 +35,7 @@ def main():
 
     rag = RAGChain()
     loader = DataLoader(rag.store)
-    logger = ChatLogger()
+    logger = ChatLogger(rag.store.client)
 
     while True:
         try:

@@ -32,7 +32,7 @@ class RAGChain:
             max_output_tokens=settings.gemini_max_tokens,
         )
         self._prompt = ChatPromptTemplate.from_template(PROMPT_TEMPLATE)
-        self._logger = ChatLogger()
+        self._logger = ChatLogger(self._store.client)
 
     @property
     def store(self) -> SupabaseStore:

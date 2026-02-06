@@ -1,19 +1,11 @@
 from typing import Any
 
-from supabase import create_client, Client
-
-from config import settings
+from supabase import Client
 
 
 class ChatLogger:
-    def __init__(self):
-        self._client: Client | None = None
-
-    @property
-    def client(self) -> Client:
-        if self._client is None:
-            self._client = create_client(settings.supabase_url, settings.supabase_key)
-        return self._client
+    def __init__(self, client: Client):
+        self._client = client
 
     def log(
         self,
@@ -22,7 +14,7 @@ class ChatLogger:
         source_documents: list[dict[str, Any]] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
-        self.client.table("chat_logs").insert({
+        self._client.table("chat_logs").insert({
             "query": query,
             "response": response,
             "source_documents": source_documents or [],
@@ -31,7 +23,7 @@ class ChatLogger:
 
     def get_recent(self, n: int = 10) -> list[dict[str, Any]]:
         response = (
-            self.client.table("chat_logs")
+            self._client.table("chat_logs")
             .select("*")
             .order("created_at", desc=True)
             .limit(n)
@@ -42,6 +34,6 @@ class ChatLogger:
         return rows
 
     def clear(self) -> None:
-        self.client.table("chat_logs").delete().neq(
+        self._client.table("chat_logs").delete().neq(
             "id", "00000000-0000-0000-0000-000000000000"
         ).execute()
