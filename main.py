@@ -2,7 +2,7 @@ from pathlib import Path
 
 from config import settings
 from embeddings import get_embeddings
-from vectorstore import ChromaStore
+from vectorstore import SupabaseStore
 from data_loader import DataLoader
 from rag import RAGChain
 from utils import ChatLogger
@@ -30,7 +30,7 @@ def print_help():
 
 def main():
     print("raonChat - Gemini 전용 건설 프로젝트 관리 RAG 챗봇")
-    print(f"모델: {settings.gemini_model} | 리랭킹: {'ON' if settings.reranker_enabled else 'OFF'}")
+    print(f"모델: {settings.gemini_model}")
     print("'/help' 입력 시 명령어 목록을 확인할 수 있습니다.\n")
 
     rag = RAGChain()
@@ -136,7 +136,7 @@ def main():
             if result["retrieved_documents"]:
                 print("--- 참고 문서 ---")
                 for doc in result["retrieved_documents"]:
-                    score = doc.get("rerank_score", doc.get("score", 0))
+                    score = doc.get("score", 0)
                     source = doc["metadata"].get("filename", "unknown")
                     print(f"  [{doc['rank']}] {source} (score: {score:.4f})")
                 print()

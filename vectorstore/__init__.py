@@ -1,3 +1,3 @@
-from vectorstore.chroma_store import ChromaStore
+from vectorstore.supabase_store import SupabaseStore
 
-__all__ = ["ChromaStore"]
+__all__ = ["SupabaseStore"]

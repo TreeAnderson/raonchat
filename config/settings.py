@@ -18,25 +18,16 @@ class Settings:
     # 임베딩
     embedding_model: str = field(default_factory=lambda: os.getenv("EMBEDDING_MODEL", "models/gemini-embedding-001"))
 
-    # ChromaDB
-    chroma_collection_name: str = "raonchat_docs"
+    # Supabase
+    supabase_url: str = field(default_factory=lambda: os.getenv("SUPABASE_URL", ""))
+    supabase_key: str = field(default_factory=lambda: os.getenv("SUPABASE_KEY", ""))
 
     # 청킹
-    chunk_size: int = 500
+    chunk_size: int = 1500
     chunk_overlap: int = 100
 
-    # 리랭킹
-    reranker_enabled: bool = field(
-        default_factory=lambda: os.getenv("RERANKER_ENABLED", "true").lower() == "true"
-    )
-    reranker_model_name: str = field(
-        default_factory=lambda: os.getenv("RERANKER_MODEL", "BAAI/bge-reranker-v2-m3")
-    )
-    retrieval_k: int = field(default_factory=lambda: int(os.getenv("RETRIEVAL_K", "20")))
-    rerank_top_k: int = field(default_factory=lambda: int(os.getenv("RERANK_TOP_K", "3")))
+    # 검색
     retriever_k: int = field(default_factory=lambda: int(os.getenv("RETRIEVER_K", "3")))
-    reranker_max_length: int = field(default_factory=lambda: int(os.getenv("RERANKER_MAX_LENGTH", "512")))
-    reranker_device: str = field(default_factory=lambda: os.getenv("RERANKER_DEVICE", "cpu"))
 
     @property
     def base_dir(self) -> Path:
@@ -49,10 +40,6 @@ class Settings:
     @property
     def logs_dir(self) -> Path:
         return self.base_dir / "logs"
-
-    @property
-    def chroma_db_path(self) -> Path:
-        return self.data_dir / "chroma_db"
 
     @property
     def chat_log_file(self) -> Path:

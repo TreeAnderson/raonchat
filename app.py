@@ -1,8 +1,25 @@
+import os
 import streamlit as st
 
+# Streamlit Cloud: st.secrets → 환경변수 주입 (config import 전에 실행)
+_SECRET_KEYS = [
+    "GOOGLE_API_KEY",
+    "SUPABASE_URL",
+    "SUPABASE_KEY",
+    "GEMINI_MODEL",
+    "GEMINI_TEMPERATURE",
+    "GEMINI_MAX_TOKENS",
+    "EMBEDDING_MODEL",
+    "RETRIEVER_K",
+]
+for key in _SECRET_KEYS:
+    if key not in os.environ:
+        try:
+            os.environ[key] = st.secrets[key]
+        except (KeyError, FileNotFoundError):
+            pass
+
 from config import settings
-from embeddings import get_embeddings
-from vectorstore import ChromaStore
 from data_loader import DataLoader
 from rag import RAGChain
 
@@ -30,7 +47,6 @@ def main():
         st.header("설정")
         st.text(f"모델: {settings.gemini_model}")
         st.text(f"임베딩: {settings.embedding_model}")
-        st.text(f"리랭킹: {'ON' if settings.reranker_enabled else 'OFF'}")
 
         st.divider()
         st.header("데이터 관리")
@@ -77,7 +93,7 @@ def main():
             if "documents" in msg:
                 with st.expander("참고 문서"):
                     for doc in msg["documents"]:
-                        score = doc.get("rerank_score", doc.get("score", 0))
+                        score = doc.get("score", 0)
                         source = doc["metadata"].get("filename", "unknown")
                         st.markdown(f"**[{doc['rank']}] {source}** (score: {score:.4f})")
                         st.text(doc["content"][:300])
@@ -97,7 +113,7 @@ def main():
             if result["retrieved_documents"]:
                 with st.expander("참고 문서"):
                     for doc in result["retrieved_documents"]:
-                        score = doc.get("rerank_score", doc.get("score", 0))
+                        score = doc.get("score", 0)
                         source = doc["metadata"].get("filename", "unknown")
                         st.markdown(f"**[{doc['rank']}] {source}** (score: {score:.4f})")
                         st.text(doc["content"][:300])
