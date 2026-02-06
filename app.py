@@ -116,6 +116,9 @@ def main():
 
             st.markdown(result["answer"])
 
+            if "log_error" in result:
+                st.error(f"로그 기록 실패: {result['log_error']}")
+
             if result["retrieved_documents"]:
                 with st.expander("참고 문서"):
                     for doc in result["retrieved_documents"]:

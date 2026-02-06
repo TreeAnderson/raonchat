@@ -73,5 +73,9 @@ class RAGChain:
             "retrieved_documents": retrieved,
         }
 
-        self._logger.log(question, answer, retrieved)
+        try:
+            self._logger.log(question, answer, retrieved)
+        except Exception as e:
+            result["log_error"] = str(e)
+
         return result
