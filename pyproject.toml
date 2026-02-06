@@ -1,0 +1,19 @@
+[project]
+name = "raonchat"
+version = "0.1.0"
+description = "Gemini 전용 건설 프로젝트 관리 RAG 챗봇"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "langchain>=0.3.0",
+    "langchain-community>=0.3.0",
+    "langchain-google-genai>=2.0.0",
+    "chromadb>=0.5.0",
+    "sentence-transformers>=3.0.0",
+    "langchain-text-splitters>=0.3.0",
+    "python-dotenv>=1.0.0",
+    "streamlit>=1.40.0",
+]
+
+[dependency-groups]
+dev = []
