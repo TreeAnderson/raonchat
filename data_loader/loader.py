@@ -8,6 +8,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from config import settings
 from vectorstore import SupabaseStore
 
+_HEADING_RE = re.compile(r'^(#{2,4})\s+(\d[\d.]*)\s+(.*)')
+_HEADING_NO_NUM_RE = re.compile(r'^(#{2,4})\s+(.*)')
+
 
 class DataLoader:
     SEPARATORS = ["\n## ", "\n### ", "\n#### ", "\n\n", "\n", " ", ""]
@@ -21,48 +24,69 @@ class DataLoader:
             separators=self.SEPARATORS,
         )
 
+    @staticmethod
+    def _parse_heading(line: str) -> dict | None:
+        """Parse a heading line into level, number, and title.
+
+        Examples:
+            "## 2. 동기본정보입력"   → level=2, number="2", title="동기본정보입력"
+            "#### 2.2.1 동 생성"     → level=4, number="2.2.1", title="동 생성"
+            "## 목차"                → level=2, number="", title="목차"
+        """
+        m = _HEADING_RE.match(line.strip())
+        if m:
+            level = len(m.group(1))
+            number = m.group(2).rstrip(".")
+            title = m.group(3).strip()
+            return {"level": level, "number": number, "title": title}
+        m = _HEADING_NO_NUM_RE.match(line.strip())
+        if m:
+            level = len(m.group(1))
+            title = m.group(2).strip()
+            return {"level": level, "number": "", "title": title}
+        return None
+
     def _separate_code_blocks(self, sections: list[dict]) -> list[dict]:
         """각 섹션에서 코드블록(```)을 분리하여 prose/code 청크로 나눈다.
 
         Returns:
-            list of {"content": str, "section": str, "content_type": "prose"|"code",
-                      "code_language": str (code only)}
+            list of dicts with all metadata keys from the section preserved,
+            plus "content_type" and optionally "code_language".
         """
         result: list[dict] = []
         code_pattern = re.compile(r"(```(\w*)\n.*?```)", re.DOTALL)
 
         for sec in sections:
+            # Build base metadata (everything except "content")
+            base_meta = {k: v for k, v in sec.items() if k != "content"}
+
             parts = code_pattern.split(sec["content"])
-            # re.split with groups returns: [before, full_match, lang, between, full_match, lang, ...]
             i = 0
             while i < len(parts):
                 if i + 2 < len(parts) and parts[i + 1] is not None and parts[i + 1].startswith("```"):
-                    # prose before the code block
                     prose_text = parts[i].strip()
                     if prose_text:
                         result.append({
+                            **base_meta,
                             "content": prose_text,
-                            "section": sec["section"],
                             "content_type": "prose",
                         })
-                    # code block
                     code_text = parts[i + 1].strip()
                     code_lang = parts[i + 2] or ""
                     if code_text:
                         result.append({
+                            **base_meta,
                             "content": code_text,
-                            "section": sec["section"],
                             "content_type": "code",
                             "code_language": code_lang,
                         })
                     i += 3
                 else:
-                    # trailing prose (no more code blocks)
                     prose_text = parts[i].strip()
                     if prose_text:
                         result.append({
+                            **base_meta,
                             "content": prose_text,
-                            "section": sec["section"],
                             "content_type": "prose",
                         })
                     i += 1
@@ -70,35 +94,96 @@ class DataLoader:
         return result
 
     def _split_markdown_sections(self, text: str) -> list[dict]:
-        """마크다운을 ### 헤딩 기준으로 분할하고, 코드블록을 분리한다.
+        """마크다운을 ##/###/#### 헤딩 기준으로 분할하고, 코드블록을 분리한다.
 
         Returns:
-            list of {"content": str, "section": str, "content_type": str, ...}
+            list of {"content": str, "section": str, "section_number": str,
+                      "h2": str, "h2_number": str, "h2_title": str,
+                      "h3": ..., "h4": ..., "content_type": str, ...}
         """
         lines = text.split("\n")
         sections: list[dict] = []
+
+        # Current heading state
         current_h2 = ""
+        current_h2_number = ""
+        current_h2_title = ""
         current_h3 = ""
+        current_h3_number = ""
+        current_h3_title = ""
+        current_h4 = ""
+        current_h4_number = ""
+        current_h4_title = ""
         current_lines: list[str] = []
+
+        def _build_section_path() -> str:
+            parts = []
+            if current_h2:
+                parts.append(current_h2)
+            if current_h3:
+                parts.append(current_h3)
+            if current_h4:
+                parts.append(current_h4)
+            return " > ".join(parts)
+
+        def _section_number() -> str:
+            """Return the most specific section number (H4 > H3 > H2)."""
+            if current_h4_number:
+                return current_h4_number
+            if current_h3_number:
+                return current_h3_number
+            return current_h2_number
 
         def _flush():
             content = "\n".join(current_lines).strip()
             if not content:
                 return
-            section_path = current_h2
+            meta = {
+                "content": content,
+                "section": _build_section_path(),
+                "section_number": _section_number(),
+                "h2": current_h2,
+                "h2_number": current_h2_number,
+                "h2_title": current_h2_title,
+            }
             if current_h3:
-                section_path = f"{current_h2} > {current_h3}" if current_h2 else current_h3
-            sections.append({"content": content, "section": section_path})
+                meta["h3"] = current_h3
+                meta["h3_number"] = current_h3_number
+                meta["h3_title"] = current_h3_title
+            if current_h4:
+                meta["h4"] = current_h4
+                meta["h4_number"] = current_h4_number
+                meta["h4_title"] = current_h4_title
+            sections.append(meta)
 
         for line in lines:
-            if re.match(r"^## ", line):
+            parsed = self._parse_heading(line)
+            if parsed and parsed["level"] == 2:
                 _flush()
                 current_h2 = line.strip()
+                current_h2_number = parsed["number"]
+                current_h2_title = parsed["title"]
                 current_h3 = ""
+                current_h3_number = ""
+                current_h3_title = ""
+                current_h4 = ""
+                current_h4_number = ""
+                current_h4_title = ""
                 current_lines = [line]
-            elif re.match(r"^### ", line):
+            elif parsed and parsed["level"] == 3:
                 _flush()
                 current_h3 = line.strip()
+                current_h3_number = parsed["number"]
+                current_h3_title = parsed["title"]
+                current_h4 = ""
+                current_h4_number = ""
+                current_h4_title = ""
+                current_lines = [line]
+            elif parsed and parsed["level"] == 4:
+                _flush()
+                current_h4 = line.strip()
+                current_h4_number = parsed["number"]
+                current_h4_title = parsed["title"]
                 current_lines = [line]
             else:
                 current_lines.append(line)
@@ -114,12 +199,13 @@ class DataLoader:
             if sec["content_type"] == "code" or len(sec["content"]) <= settings.chunk_size:
                 result.append(sec)
             else:
+                # Preserve all metadata except content
+                base_meta = {k: v for k, v in sec.items() if k != "content"}
                 sub_chunks = self._splitter.split_text(sec["content"])
                 for chunk in sub_chunks:
                     result.append({
+                        **base_meta,
                         "content": chunk,
-                        "section": sec["section"],
-                        "content_type": "prose",
                     })
 
         return result
@@ -173,11 +259,20 @@ class DataLoader:
                     "title": title,
                     "category": category,
                     "section": sec["section"],
+                    "section_number": sec.get("section_number", ""),
                     "content_type": sec.get("content_type", "prose"),
                     "chunk_index": i,
                     "total_chunks": len(section_chunks),
                     "ingested_at": datetime.now().isoformat(),
+                    "h2_number": sec.get("h2_number", ""),
+                    "h2_title": sec.get("h2_title", ""),
                 }
+                if sec.get("h3"):
+                    meta["h3_number"] = sec.get("h3_number", "")
+                    meta["h3_title"] = sec.get("h3_title", "")
+                if sec.get("h4"):
+                    meta["h4_number"] = sec.get("h4_number", "")
+                    meta["h4_title"] = sec.get("h4_title", "")
                 if sec.get("code_language"):
                     meta["code_language"] = sec["code_language"]
                 doc = Document(

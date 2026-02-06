@@ -81,7 +81,29 @@ class RAGChain:
                 "retrieved_documents": [],
             }
 
-        context = "\n\n".join(doc.page_content for doc, _ in docs_with_scores)
+        # Extract unique (section_number, source) pairs from top-k results
+        seen = set()
+        section_keys = []
+        for doc, score in docs_with_scores:
+            sn = doc.metadata.get("section_number", "")
+            src = doc.metadata.get("source", "")
+            if sn and (sn, src) not in seen:
+                seen.add((sn, src))
+                section_keys.append((sn, src))
+
+        # Fetch full sections and assemble context
+        if section_keys:
+            context_parts = []
+            for sn, src in section_keys:
+                section_docs = self._store.fetch_by_section_number(sn, source=src)
+                section_content = "\n\n".join(d.page_content for d in section_docs)
+                if section_content:
+                    context_parts.append(section_content)
+            context = "\n\n---\n\n".join(context_parts)
+        else:
+            # Fallback: no section_number available, use top-k as-is
+            context = "\n\n".join(doc.page_content for doc, _ in docs_with_scores)
+
         chain = self._prompt | self._llm
         response = chain.invoke({"context": context, "question": question})
         answer = response.content

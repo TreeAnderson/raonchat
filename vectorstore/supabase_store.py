@@ -101,6 +101,27 @@ class SupabaseStore:
         except Exception:
             return False
 
+    def fetch_by_section_number(
+        self, section_number: str, source: str | None = None
+    ) -> list[Document]:
+        """같은 section_number의 모든 청크를 chunk_index 순으로 반환."""
+        query = (
+            self.client.table("documents")
+            .select("content, metadata")
+            .eq("metadata->>section_number", section_number)
+        )
+        if source:
+            query = query.eq("metadata->>source", source)
+        response = query.order("metadata->>chunk_index").execute()
+
+        return [
+            Document(
+                page_content=row["content"],
+                metadata=row.get("metadata", {}),
+            )
+            for row in (response.data or [])
+        ]
+
     def delete_by_source(self, source: str) -> int:
         response = (
             self.client.table("documents")
