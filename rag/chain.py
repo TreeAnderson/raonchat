@@ -158,7 +158,7 @@ class RAGChain:
         }
 
         try:
-            self._logger.log(question, answer, retrieved)
+            self._logger.log(question, answer, retrieved, thinking_mode=thinking)
         except Exception as e:
             result["log_error"] = str(e)
 

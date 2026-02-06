@@ -13,12 +13,14 @@ class ChatLogger:
         response: str,
         source_documents: list[dict[str, Any]] | None = None,
         metadata: dict[str, Any] | None = None,
+        thinking_mode: bool = False,
     ) -> None:
         response_obj = self._client.table("chat_logs").insert({
             "query": query,
             "response": response,
             "source_documents": source_documents or [],
             "metadata": metadata or {},
+            "thinking_mode": 1 if thinking_mode else 0,
         }).execute()
         if not response_obj.data:
             raise RuntimeError(
