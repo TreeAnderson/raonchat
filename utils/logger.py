@@ -14,12 +14,19 @@ class ChatLogger:
         source_documents: list[dict[str, Any]] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
-        self._client.table("chat_logs").insert({
+        response_obj = self._client.table("chat_logs").insert({
             "query": query,
             "response": response,
             "source_documents": source_documents or [],
             "metadata": metadata or {},
         }).execute()
+        if not response_obj.data:
+            raise RuntimeError(
+                "chat_logs INSERT가 차단되었습니다. "
+                "Supabase SQL Editor에서 실행: "
+                "ALTER TABLE chat_logs DISABLE ROW LEVEL SECURITY; "
+                "GRANT ALL ON chat_logs TO anon;"
+            )
 
     def get_recent(self, n: int = 10) -> list[dict[str, Any]]:
         response = (

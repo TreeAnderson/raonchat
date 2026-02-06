@@ -61,3 +61,9 @@ create table chat_logs (
     metadata jsonb default '{}'::jsonb,
     created_at timestamptz default now()
 );
+
+-- 6. RLS 비활성화 & anon 권한 부여
+alter table documents disable row level security;
+alter table chat_logs disable row level security;
+grant all on documents to anon;
+grant all on chat_logs to anon;
