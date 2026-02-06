@@ -1,3 +1,3 @@
-from vectorstore.supabase_store import SupabaseStore
+from .supabase_store import SupabaseStore
 
 __all__ = ["SupabaseStore"]

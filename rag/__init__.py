@@ -1,3 +1,3 @@
-from rag.chain import RAGChain
+from .chain import RAGChain
 
 __all__ = ["RAGChain"]

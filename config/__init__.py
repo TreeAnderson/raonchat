@@ -1,4 +1,4 @@
-from config.settings import Settings
+from .settings import Settings
 
 settings = Settings()
 

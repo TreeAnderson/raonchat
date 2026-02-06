@@ -1,3 +1,3 @@
-from utils.logger import ChatLogger
+from .logger import ChatLogger
 
 __all__ = ["ChatLogger"]
