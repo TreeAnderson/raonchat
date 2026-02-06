@@ -1,4 +1,10 @@
 import os
+import sys
+from pathlib import Path
+
+# 프로젝트 루트를 sys.path 최상위에 추가 (패키지명 충돌 방지)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 import streamlit as st
 
 # Streamlit Cloud: st.secrets → 환경변수 주입 (config import 전에 실행)
