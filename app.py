@@ -85,6 +85,11 @@ def main():
         if using_custom:
             st.caption("✅ 사용자 API 키 사용 중")
 
+        thinking_mode = st.toggle(
+            "사고 모드",
+            help="활성화하면 단계별 분석과 용어 설명을 포함한 심층 답변을 생성합니다.",
+        )
+
         st.divider()
         st.header("데이터 관리")
 
@@ -160,9 +165,10 @@ def main():
             st.markdown(question)
 
         with st.chat_message("assistant"):
-            with st.spinner("답변 생성 중..."):
+            spinner_text = "심층 분석 중..." if thinking_mode else "답변 생성 중..."
+            with st.spinner(spinner_text):
                 try:
-                    result = rag.query(question)
+                    result = rag.query(question, thinking=thinking_mode)
                 except Exception as e:
                     if "RESOURCE_EXHAUSTED" in str(e) or "429" in str(e):
                         result = {

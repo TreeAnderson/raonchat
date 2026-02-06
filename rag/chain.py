@@ -27,6 +27,27 @@ PROMPT_TEMPLATE = """\
 
 답변:"""
 
+THINKING_PROMPT_TEMPLATE = """\
+너는 제공된 문서의 정보만을 사용하여 질문에 심도 있게 답변하는 전문가야.
+
+## 기본 원칙
+- 반드시 문서에 있는 내용만 사용해. 문서에 없는 내용은 "제공된 문서에서 해당 정보를 찾을 수 없습니다"라고 답해.
+- 가능하면 문서의 구체적인 내용을 인용해.
+
+## 심층 분석 지침
+- 관련 용어나 개념이 있으면 먼저 간략히 설명해.
+- 답변을 단계별로 구조화해서 작성해.
+- 문서의 여러 섹션에 걸친 내용이면 관련 섹션들을 연결해서 종합적으로 분석해.
+- 핵심 포인트를 정리해서 제공해.
+
+<context>
+{context}
+</context>
+
+질문: {question}
+
+답변:"""
+
 
 class RAGChain:
     def __init__(self):
@@ -40,6 +61,15 @@ class RAGChain:
             max_output_tokens=settings.gemini_max_tokens,
         )
         self._prompt = ChatPromptTemplate.from_template(PROMPT_TEMPLATE)
+        self._thinking_llm = ChatGoogleGenerativeAI(
+            model=settings.gemini_model,
+            google_api_key=settings.google_api_key,
+            temperature=0.7,
+            top_p=0.9,
+            max_output_tokens=settings.gemini_max_tokens * 4,
+            thinking_budget=8192,
+        )
+        self._thinking_prompt = ChatPromptTemplate.from_template(THINKING_PROMPT_TEMPLATE)
         self._logger = ChatLogger(self._store.client)
 
     @property
@@ -51,9 +81,9 @@ class RAGChain:
         q = question.lower()
         return any(kw in q for kw in CODE_KEYWORDS)
 
-    def query(self, question: str) -> dict:
+    def query(self, question: str, thinking: bool = False) -> dict:
         try:
-            return self._query(question)
+            return self._query(question, thinking=thinking)
         except Exception as e:
             if "RESOURCE_EXHAUSTED" in str(e) or "429" in str(e):
                 return {
@@ -67,7 +97,7 @@ class RAGChain:
                 }
             raise
 
-    def _query(self, question: str) -> dict:
+    def _query(self, question: str, thinking: bool = False) -> dict:
         search_filter = None if self._is_code_query(question) else {"content_type": "prose"}
         docs_with_scores = self._store.similarity_search_with_score(
             question, k=settings.retriever_k, filter=search_filter
@@ -104,7 +134,9 @@ class RAGChain:
             # Fallback: no section_number available, use top-k as-is
             context = "\n\n".join(doc.page_content for doc, _ in docs_with_scores)
 
-        chain = self._prompt | self._llm
+        llm = self._thinking_llm if thinking else self._llm
+        prompt = self._thinking_prompt if thinking else self._prompt
+        chain = prompt | llm
         response = chain.invoke({"context": context, "question": question})
         answer = response.content
 
