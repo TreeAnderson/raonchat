@@ -49,3 +49,15 @@ begin
     limit match_count;
 end;
 $$;
+
+-- 5. chat_logs 테이블 (사용자 대화 로그)
+drop table if exists chat_logs;
+
+create table chat_logs (
+    id uuid primary key default gen_random_uuid(),
+    query text not null,
+    response text not null,
+    source_documents jsonb default '[]'::jsonb,
+    metadata jsonb default '{}'::jsonb,
+    created_at timestamptz default now()
+);

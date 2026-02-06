@@ -1,29 +1,19 @@
-import json
-from datetime import datetime
-from pathlib import Path
 from typing import Any
+
+from supabase import create_client, Client
 
 from config import settings
 
 
 class ChatLogger:
-    def __init__(self, log_file: Path | None = None):
-        self.log_file = log_file or settings.chat_log_file
-        self.log_file.parent.mkdir(parents=True, exist_ok=True)
+    def __init__(self):
+        self._client: Client | None = None
 
-    def _load_logs(self) -> list[dict[str, Any]]:
-        if not self.log_file.exists():
-            return []
-        text = self.log_file.read_text(encoding="utf-8").strip()
-        if not text:
-            return []
-        return json.loads(text)
-
-    def _save_logs(self, logs: list[dict[str, Any]]) -> None:
-        self.log_file.write_text(
-            json.dumps(logs, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+    @property
+    def client(self) -> Client:
+        if self._client is None:
+            self._client = create_client(settings.supabase_url, settings.supabase_key)
+        return self._client
 
     def log(
         self,
@@ -32,21 +22,26 @@ class ChatLogger:
         source_documents: list[dict[str, Any]] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
-        logs = self._load_logs()
-        logs.append(
-            {
-                "timestamp": datetime.now().isoformat(),
-                "query": query,
-                "response": response,
-                "source_documents": source_documents or [],
-                "metadata": metadata or {},
-            }
-        )
-        self._save_logs(logs)
+        self.client.table("chat_logs").insert({
+            "query": query,
+            "response": response,
+            "source_documents": source_documents or [],
+            "metadata": metadata or {},
+        }).execute()
 
     def get_recent(self, n: int = 10) -> list[dict[str, Any]]:
-        logs = self._load_logs()
-        return logs[-n:]
+        response = (
+            self.client.table("chat_logs")
+            .select("*")
+            .order("created_at", desc=True)
+            .limit(n)
+            .execute()
+        )
+        rows = response.data or []
+        rows.reverse()
+        return rows
 
     def clear(self) -> None:
-        self._save_logs([])
+        self.client.table("chat_logs").delete().neq(
+            "id", "00000000-0000-0000-0000-000000000000"
+        ).execute()

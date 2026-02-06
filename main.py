@@ -112,7 +112,7 @@ def main():
                 print("대화 로그가 없습니다.")
             else:
                 for log in logs:
-                    print(f"\n[{log['timestamp']}]")
+                    print(f"\n[{log['created_at']}]")
                     print(f"  Q: {log['query']}")
                     answer_preview = log["response"][:100]
                     print(f"  A: {answer_preview}{'...' if len(log['response']) > 100 else ''}")
