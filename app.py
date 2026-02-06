@@ -136,7 +136,20 @@ def main():
 
         with st.chat_message("assistant"):
             with st.spinner("답변 생성 중..."):
-                result = rag.query(question)
+                try:
+                    result = rag.query(question)
+                except Exception as e:
+                    if "RESOURCE_EXHAUSTED" in str(e) or "429" in str(e):
+                        result = {
+                            "answer": (
+                                "현재 API 호출 한도에 도달했습니다. "
+                                "약 1분 후에 다시 질문해 주세요.\n\n"
+                                "> Gemini 무료 플랜은 분당 요청 수가 제한되어 있습니다."
+                            ),
+                            "retrieved_documents": [],
+                        }
+                    else:
+                        raise
 
             st.markdown(result["answer"])
 
@@ -156,7 +169,7 @@ def main():
             {
                 "role": "assistant",
                 "content": result["answer"],
-                "documents": result["retrieved_documents"],
+                "documents": result.get("retrieved_documents", []),
             }
         )
 
