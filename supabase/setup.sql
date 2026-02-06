@@ -17,14 +17,9 @@ create table documents (
     created_at timestamptz default now()
 );
 
--- 4. IVFFlat 인덱스 (cosine similarity)
--- 주의: 데이터가 최소 수백 개 이상 있어야 효과적. 초기에는 생략 가능.
-create index documents_embedding_idx
-    on documents
-    using ivfflat (embedding vector_cosine_ops)
-    with (lists = 100);
-
--- 5. match_documents RPC 함수 (cosine similarity 검색)
+-- 4. match_documents RPC 함수 (cosine similarity 검색)
+-- 참고: gemini-embedding-001은 3072차원으로 IVFFlat(최대 2000차원) 사용 불가.
+-- 문서 수가 수천 개 이하이면 인덱스 없이 sequential scan으로 충분.
 create or replace function match_documents(
     query_embedding vector(3072),
     match_count int default 3,
