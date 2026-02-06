@@ -45,6 +45,13 @@ def main():
     st.title("라온 챗봇 테스트")
     st.caption("ConTech-DX 플랫폼 도우미 - 테스트 버전")
 
+    # 사용자 API 키 반영 (cache_resource 생성 전에 실행)
+    if "default_api_key" not in st.session_state:
+        st.session_state["default_api_key"] = settings.google_api_key
+
+    custom_key = st.session_state.get("custom_api_key", "")
+    settings.google_api_key = custom_key if custom_key else st.session_state["default_api_key"]
+
     rag = init_rag()
     loader = init_loader(rag)
 
@@ -59,6 +66,24 @@ def main():
         st.header("설정")
         st.text(f"모델: {settings.gemini_model}")
         st.text(f"임베딩: {settings.embedding_model}")
+
+        def _on_api_key_change():
+            new_key = st.session_state.get("api_key_input", "").strip()
+            if new_key != st.session_state.get("custom_api_key", ""):
+                st.session_state["custom_api_key"] = new_key
+                st.cache_resource.clear()
+
+        using_custom = bool(st.session_state.get("custom_api_key"))
+        st.text_input(
+            "Google API Key (선택)",
+            type="password",
+            key="api_key_input",
+            placeholder="무료 한도 초과 시 본인 키 입력",
+            on_change=_on_api_key_change,
+            help="입력하면 기본 키 대신 사용됩니다. 비우면 기본 키로 복원됩니다.",
+        )
+        if using_custom:
+            st.caption("✅ 사용자 API 키 사용 중")
 
         st.divider()
         st.header("데이터 관리")

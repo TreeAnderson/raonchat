@@ -11,8 +11,9 @@ load_dotenv()
 class Settings:
     # Gemini API
     google_api_key: str = field(default_factory=lambda: os.getenv("GOOGLE_API_KEY", ""))
-    gemini_model: str = field(default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-2.0-flash"))
-    gemini_temperature: float = field(default_factory=lambda: float(os.getenv("GEMINI_TEMPERATURE", "0.3")))
+    gemini_model: str = field(default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
+    gemini_temperature: float = field(default_factory=lambda: float(os.getenv("GEMINI_TEMPERATURE", "0")))
+    gemini_top_p: float = field(default_factory=lambda: float(os.getenv("GEMINI_TOP_P", "0.95")))
     gemini_max_tokens: int = field(default_factory=lambda: int(os.getenv("GEMINI_MAX_TOKENS", "1024")))
 
     # 임베딩

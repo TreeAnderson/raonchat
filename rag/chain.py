@@ -14,8 +14,10 @@ CODE_KEYWORDS = (
 PROMPT_TEMPLATE = """\
 너는 제공된 문서의 정보만을 사용하여 질문에 답변하는 전문가야.
 - 문서에 없는 내용은 "제공된 문서에서 해당 정보를 찾을 수 없습니다"라고 답해.
-- 답변은 간결하고 정확하게 해.
 - 가능하면 문서의 구체적인 내용을 인용해.
+- 가능하면 전체적인 관점에서 내용을 조합해.
+- 답변은 간결하게 해.
+- 옆의 설명은 간결하게 해.
 
 <context>
 {context}
@@ -34,6 +36,7 @@ class RAGChain:
             model=settings.gemini_model,
             google_api_key=settings.google_api_key,
             temperature=settings.gemini_temperature,
+            top_p=settings.gemini_top_p,
             max_output_tokens=settings.gemini_max_tokens,
         )
         self._prompt = ChatPromptTemplate.from_template(PROMPT_TEMPLATE)
