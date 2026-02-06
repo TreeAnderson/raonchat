@@ -12,6 +12,9 @@ wheels/
 # Environment variables
 .env
 
+# Project design docs
+STRUCTURE.md
+
 # Data and logs (optional - uncomment if needed)
 # data/
 # logs/
